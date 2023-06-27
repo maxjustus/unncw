@@ -8,7 +8,7 @@ use std::io::SeekFrom;
 use walkdir::WalkDir;
 use std::path::PathBuf;
 use clap::Parser;
-use clap::{arg};
+use clap::arg;
 
 #[derive(Parser)]
 struct Args {
@@ -18,7 +18,15 @@ struct Args {
         value_name = "DIR",
         help = "Input directory containing .ncw files"
     )]
-    input_dir: PathBuf
+    input_dir: PathBuf,
+
+    #[arg(
+        short = 'o',
+        long = "output-dir",
+        value_name = "DIR",
+        help = "Output directory (defaults to same as input file)"
+    )]
+    output_dir: Option<PathBuf>
 }
 
 fn get_u16<T: Read>(f: &mut T) -> u16 {
@@ -46,6 +54,7 @@ fn seek<T: std::io::Seek + Read>(f: &mut T, n: usize) -> () {
 fn main() -> Result<(), std::io::Error> {
     let matches = Args::parse();
     let input_dir = matches.input_dir;
+    let output_dir = matches.output_dir;
 
      let ncw_paths: Vec<_> = WalkDir::new(input_dir.clone())
      .into_iter()
@@ -144,13 +153,13 @@ fn main() -> Result<(), std::io::Error> {
                 }
             }
         }
-        let mut out_filename: String = path.path().to_str().unwrap().into();
-        if out_filename.ends_with(".ncw") {
-            let len = out_filename.len();
-            out_filename.replace_range((len - 4)..len, ".wav");
+
+        let out_filename = if let Some(out) = &output_dir {
+            out.as_path().to_str().unwrap().to_string() + path.file_name().to_str().unwrap()
         } else {
-            out_filename += &".wav";
-        }
+            path.path().to_str().unwrap().into()
+        }.replace(".ncw", ".wav");
+
         let mut out_file = BufWriter::new(File::create(&out_filename).unwrap());
         let bytes_per_sample = 4usize;
         out_file.write(b"RIFF")?;
