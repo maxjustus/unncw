@@ -1,36 +1,66 @@
+extern crate clap;
+
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
 use std::io::SeekFrom;
+use walkdir::WalkDir;
+use std::path::PathBuf;
+use clap::Parser;
+use clap::{arg};
 
-pub(crate) fn get_u16<T: Read>(f: &mut T) -> u16 {
+#[derive(Parser)]
+struct Args {
+    #[arg(
+        short = 'i',
+        long = "input-dir",
+        value_name = "DIR",
+        help = "Input directory containing .ncw files"
+    )]
+    input_dir: PathBuf
+}
+
+fn get_u16<T: Read>(f: &mut T) -> u16 {
     let mut buffer = [0; 2];
     f.read_exact(&mut buffer).unwrap();
     u16::from_le_bytes(buffer)
 }
 
-pub(crate) fn get_u32<T: Read>(f: &mut T) -> u32 {
+fn get_u32<T: Read>(f: &mut T) -> u32 {
     let mut buffer = [0; 4];
     f.read_exact(&mut buffer).unwrap();
     u32::from_le_bytes(buffer)
 }
 
-pub(crate) fn get_i32<T: Read>(f: &mut T) -> i32 {
+fn get_i32<T: Read>(f: &mut T) -> i32 {
     let mut buffer = [0; 4];
     f.read_exact(&mut buffer).unwrap();
     i32::from_le_bytes(buffer)
 }
 
-pub(crate) fn seek<T: std::io::Seek + Read>(f: &mut T, n: usize) -> () {
+fn seek<T: std::io::Seek + Read>(f: &mut T, n: usize) -> () {
     f.seek(SeekFrom::Start(n as u64)).unwrap();
 }
 
 fn main() -> Result<(), std::io::Error> {
-    let args = std::env::args().collect::<Vec<String>>();
-    for arg in &args[1..] {
-        println!("opening {}...", arg);
-        let mut _f = File::open(arg).unwrap();
+    let matches = Args::parse();
+    let input_dir = matches.input_dir;
+
+     let ncw_paths: Vec<_> = WalkDir::new(input_dir.clone())
+     .into_iter()
+     .filter_entry(|p| {
+         let file_name = p.file_name().to_str().unwrap();
+         println!("{}", file_name);
+         p.file_type().is_dir() || (file_name.ends_with(".ncw"))
+     })
+     .filter_map(|f| f.ok())
+     .filter(|f| f.file_type().is_file())
+     .collect();
+
+    for path in ncw_paths {
+        println!("opening {}...", path.path().to_str().unwrap());
+        let mut _f = File::open(path.path()).unwrap();
         let f = &mut _f;
         seek(f, 0x8);
         let num_channels = get_u16(f) as u32;
@@ -114,7 +144,7 @@ fn main() -> Result<(), std::io::Error> {
                 }
             }
         }
-        let mut out_filename = arg.clone();
+        let mut out_filename: String = path.path().to_str().unwrap().into();
         if out_filename.ends_with(".ncw") {
             let len = out_filename.len();
             out_filename.replace_range((len - 4)..len, ".wav");

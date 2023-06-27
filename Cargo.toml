@@ -1,7 +1,8 @@
 [package]
 name = "unncw"
 version = "0.1.0"
-authors = ["John Smith <john.smith@example.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
+clap = { version = "4.3.8", features = ["derive"] }
+walkdir = "2.3.3"
