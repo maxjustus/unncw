@@ -9,6 +9,7 @@ use walkdir::WalkDir;
 use std::path::PathBuf;
 use clap::Parser;
 use clap::arg;
+use rayon::prelude::*;
 
 #[derive(Parser)]
 struct Args {
@@ -67,7 +68,7 @@ fn main() -> Result<(), std::io::Error> {
      .filter(|f| f.file_type().is_file())
      .collect();
 
-    for path in ncw_paths {
+    ncw_paths.par_iter().for_each(|path| {
         println!("opening {}...", path.path().to_str().unwrap());
         let mut _f = File::open(path.path()).unwrap();
         let f = &mut _f;
@@ -162,39 +163,39 @@ fn main() -> Result<(), std::io::Error> {
 
         let mut out_file = BufWriter::new(File::create(&out_filename).unwrap());
         let bytes_per_sample = 4usize;
-        out_file.write(b"RIFF")?;
-        out_file.write(&((samples[0].len() * bytes_per_sample + 0x24 + 0xC) as u32).to_le_bytes())?;
-        out_file.write(b"WAVEfmt ")?;
-        out_file.write(&16u32.to_le_bytes())?;
-        out_file.write(&3u16.to_le_bytes())?;
-        out_file.write(&(num_channels as u16).to_le_bytes())?;
-        out_file.write(&sample_rate.to_le_bytes())?;
+        out_file.write(b"RIFF").unwrap();
+        out_file.write(&((samples[0].len() * bytes_per_sample + 0x24 + 0xC) as u32).to_le_bytes()).unwrap();
+        out_file.write(b"WAVEfmt ").unwrap();
+        out_file.write(&16u32.to_le_bytes()).unwrap();
+        out_file.write(&3u16.to_le_bytes()).unwrap();
+        out_file.write(&(num_channels as u16).to_le_bytes()).unwrap();
+        out_file.write(&sample_rate.to_le_bytes()).unwrap();
         out_file
-            .write(&(sample_rate * bytes_per_sample as u32 * num_channels as u32).to_le_bytes())?;
-        out_file.write(&(bytes_per_sample as u16).to_le_bytes())?;
-        out_file.write(&(bytes_per_sample as u16 * 8).to_le_bytes())?;
-        out_file.write(b"fact")?;
-        out_file.write(&4u32.to_le_bytes())?;
-        out_file.write(&(samples[0].len() as u32).to_le_bytes())?;
-        out_file.write(b"data")?;
+            .write(&(sample_rate * bytes_per_sample as u32 * num_channels as u32).to_le_bytes()).unwrap();
+        out_file.write(&(bytes_per_sample as u16).to_le_bytes()).unwrap();
+        out_file.write(&(bytes_per_sample as u16 * 8).to_le_bytes()).unwrap();
+        out_file.write(b"fact").unwrap();
+        out_file.write(&4u32.to_le_bytes()).unwrap();
+        out_file.write(&(samples[0].len() as u32).to_le_bytes()).unwrap();
+        out_file.write(b"data").unwrap();
         out_file.write(
             &((samples[0].len() * bytes_per_sample * num_channels as usize) as u32).to_le_bytes(),
-        )?;
+        ).unwrap();
         for i in 0..sample_count as usize {
             if sidemid_flags[i / 512] == 0 {
                 for c in 0..num_channels as usize {
-                    out_file.write(&samples[c][i].to_le_bytes())?;
+                    out_file.write(&samples[c][i].to_le_bytes()).unwrap();
                 }
             } else {
                 let mid = &samples[0][i];
                 let side = &samples[1][i];
                 let left = mid + side;
                 let right = mid - side;
-                out_file.write(&left.to_le_bytes())?;
-                out_file.write(&right.to_le_bytes())?;
+                out_file.write(&left.to_le_bytes()).unwrap();
+                out_file.write(&right.to_le_bytes()).unwrap();
             }
         }
         println!("wrote {}", out_filename);
-    }
+    });
     Ok(())
 }
